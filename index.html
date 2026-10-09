@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101615" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Havana Café · Sissu — a little place above the clouds</title>
+    <meta
+      name="description"
+      content="A small café at 3,100 m in Sissu, Lahaul. Fly in through the valley, take a seat, and order from your table."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // The cinematic route paints the poster first; the QR menu route never needs it.
+      if (location.pathname === '/' || location.pathname === '') {
+        var l = document.createElement('link')
+        l.rel = 'preload'
+        l.as = 'image'
+        l.href = '/media/journey-poster.webp'
+        l.setAttribute('fetchpriority', 'high')
+        document.head.appendChild(l)
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Havana Café, Sissu. Please enable JavaScript to view the menu and order.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
