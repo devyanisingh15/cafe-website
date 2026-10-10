@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { cafe } from '../data/cafe'
 import { categories, menu } from '../data/menu'
 import { useCart } from '../hooks/useCart'
@@ -42,6 +42,13 @@ export function Menu() {
   const spyPaused = useRef(0)
   const hello = greeting()
   const closeReceipt = useCallback(() => setReceipt(null), [])
+
+  // Deep links like /menu#cat-tea (from the landing menu's category chips).
+  const { hash } = useLocation()
+  useEffect(() => {
+    const el = hash && document.getElementById(hash.slice(1))
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }))
+  }, [hash])
 
   // Scroll-spy: highlight the category currently under the sticky tabs.
   useEffect(() => {

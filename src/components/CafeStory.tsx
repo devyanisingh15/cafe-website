@@ -22,20 +22,20 @@ function Plate({ still, alt, caption, tall = false }: { still: Still; alt: strin
   )
 }
 
-/** Picks up exactly where the flight ends: inside, at the window wall. */
+/** Below the landing: the room, slowly, for those who scroll on. */
 export function CafeStory() {
   return (
     <section id="story" className="story" aria-labelledby="story-title">
       <div className="story__arrival">
         <p className="kicker" data-reveal>
-          {cafe.place} · {cafe.altitude}
+          Our story · {cafe.place}
         </p>
         <h2 id="story-title" className="display" data-reveal>
-          You made it.
+          Stay a while.
         </h2>
         <p className="story__lede" data-reveal>
           <span>Take a seat.</span>
-          <span>Stay a while.</span>
+          <span>The mountains aren’t going anywhere.</span>
         </p>
       </div>
 

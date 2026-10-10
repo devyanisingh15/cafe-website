@@ -22,32 +22,21 @@ export const navLinks = [
 ] as const
 
 /**
- * Words over the flight. `at` is the scroll progress (0–1) through the
- * journey where each line is fully visible; it fades in and out around it.
+ * Words over the flight, timed to the film (seconds). Each line is fully
+ * visible from `from` to `to` and fades in and out around that window.
+ * Shot starts (printed by scripts/build-media.sh): mountains 0, valley 1.2,
+ * village 1.9, blue roof 2.7, approach 4.2, front door 6.3, sign 7.3,
+ * inside 8.1, window wall 10.3; the camera settles by ~14 s.
  */
-export const journeyChapters = [
-  { at: 0.2, kicker: 'Lahaul valley', lines: ['The road climbs', 'past 3,100 metres.'] },
-  { at: 0.39, kicker: 'Sissu', lines: ['There —', 'the blue roof.'] },
-  { at: 0.62, kicker: 'Arrival', lines: ['The road ends', 'at our door.'] },
-  { at: 0.76, kicker: 'Come in', lines: ['Mind the', 'prayer flags.'] },
+export const flightTitleOut = 2.6 // the opening title leaves as the camera dives
+export const flightChapters = [
+  { from: 3.0, to: 4.1, kicker: 'Sissu, Lahaul', lines: ['There —', 'the blue roof.'] },
+  { from: 6.5, to: 7.4, kicker: 'Arrival', lines: ['The road ends', 'at our door.'] },
+  { from: 8.6, to: 9.8, kicker: 'Come in', lines: ['Mind the', 'prayer flags.'] },
 ] as const
 
-/**
- * Maps scroll progress to a time in the journey edit (seconds), so each beat
- * of the story lands where it should: café visible ~30%, exterior ~70%,
- * entrance ~85%, inside at 100%. The first 1.8 s (clouds) plays by itself on
- * load. Must stay in sync with SHOTS in scripts/build-media.sh.
- */
-export const journeyKeyframes: ReadonlyArray<readonly [progress: number, time: number]> = [
-  [0, 1.8],
-  [0.15, 4.2],
-  [0.3, 6.2],
-  [0.5, 8.1],
-  [0.7, 9.6],
-  [0.85, 11.3],
-  [1, 17.7],
-]
-export const journeyIdleEnd = 1.8
+/** Dishes shown in the menu that rises when the flight lands. */
+export const arrivalPicks = ['cappuccino', 'masala-chai', 'veg-momos'] as const
 
 export type Still =
   | 'interior-windows'

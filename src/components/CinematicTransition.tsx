@@ -1,42 +1,39 @@
 import { useImperativeHandle, useRef, type Ref } from 'react'
-import { journeyChapters, type Still } from '../data/cafe'
-import { stillSrc, stillSrcSet } from '../lib/media'
+import { flightChapters } from '../data/cafe'
 
 export interface CinematicHandle {
-  update: (progress: number) => void
+  /** Film time in seconds, and the film's length. */
+  update: (t: number, duration: number) => void
 }
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n)
-const HOLD = 0.035 // fully visible within ±HOLD of a chapter's `at`
-const FADE = 0.06 // then fades over this much progress
+const FADE = 0.55 // seconds to fade a line in or out
 
 /**
- * Everything layered over the flight: the chapter lines that surface as the
- * camera passes each landmark, the progress rail, and the veil that darkens
- * the last frames so the stage hands off seamlessly to "You made it."
- * Writes styles directly — no React renders while scrolling.
+ * Everything layered over the flight while it plays: the chapter lines that
+ * surface as the camera passes each landmark, and a hairline of progress.
+ * Written imperatively from the film's clock — no React renders per frame.
  */
 export function CinematicTransition({ ref }: { ref?: Ref<CinematicHandle> }) {
   const chapters = useRef<(HTMLDivElement | null)[]>([])
-  const fill = useRef<HTMLDivElement>(null)
-  const veil = useRef<HTMLDivElement>(null)
+  const bar = useRef<HTMLDivElement>(null)
 
   useImperativeHandle(
     ref,
     () => ({
-      update(p) {
-        journeyChapters.forEach((c, i) => {
+      update(t, duration) {
+        flightChapters.forEach((c, i) => {
           const el = chapters.current[i]
           if (!el) return
-          const d = p - c.at
-          const o = clamp01(1 - (Math.abs(d) - HOLD) / FADE)
+          const o = clamp01(Math.min((t - (c.from - FADE)) / FADE, (c.to + FADE - t) / FADE))
+          // Lines drift up past the lens, as if the camera were moving under them.
+          const drift = (t - (c.from + c.to) / 2) * -14
           el.style.opacity = String(o)
-          el.style.transform = `translate3d(0, ${(-d * 420).toFixed(1)}px, 0)`
+          el.style.transform = `translate3d(0, ${drift.toFixed(1)}px, 0)`
           el.style.filter = o > 0.98 ? 'none' : `blur(${((1 - o) * 6).toFixed(1)}px)`
           el.style.visibility = o > 0 ? 'visible' : 'hidden'
         })
-        if (fill.current) fill.current.style.transform = `scaleY(${p.toFixed(4)})`
-        if (veil.current) veil.current.style.opacity = String(clamp01((p - 0.9) / 0.1))
+        if (bar.current) bar.current.style.transform = `scaleX(${clamp01(t / duration).toFixed(4)})`
       },
     }),
     [],
@@ -44,17 +41,17 @@ export function CinematicTransition({ ref }: { ref?: Ref<CinematicHandle> }) {
 
   return (
     <>
-      <div className="journey-chapters">
-        {journeyChapters.map((c, i) => (
+      <div className="flight-chapters" aria-hidden="true">
+        {flightChapters.map((c, i) => (
           <div
-            key={c.at}
-            className="journey-chapter"
+            key={c.from}
+            className="flight-chapter"
             ref={(el) => {
               chapters.current[i] = el
             }}
           >
             <p className="kicker">{c.kicker}</p>
-            <p className="journey-chapter__lines">
+            <p className="flight-chapter__lines">
               {c.lines.map((l) => (
                 <span key={l}>{l}</span>
               ))}
@@ -62,45 +59,9 @@ export function CinematicTransition({ ref }: { ref?: Ref<CinematicHandle> }) {
           </div>
         ))}
       </div>
-      <div className="journey-rail" aria-hidden="true">
-        <div className="journey-rail__fill" ref={fill} />
+      <div className="flight-progress" aria-hidden="true">
+        <div className="flight-progress__bar" ref={bar} />
       </div>
-      <div className="journey-veil" ref={veil} aria-hidden="true" />
     </>
-  )
-}
-
-/**
- * Reduced-motion / data-saver version of the journey: the same beats as
- * still photographs with a gentle fade, no scroll-linked motion.
- */
-const STILLS: Still[] = ['cafe-village', 'cafe-aerial', 'storefront', 'flags']
-
-export function JourneyStills() {
-  return (
-    <div className="journey-stills" id="arrive">
-      {journeyChapters.map((c, i) => (
-        <figure key={c.at} className="journey-still" data-reveal>
-          <img
-            src={stillSrc(STILLS[i])}
-            srcSet={stillSrcSet(STILLS[i])}
-            sizes="100vw"
-            alt=""
-            loading="lazy"
-            decoding="async"
-            width={504}
-            height={624}
-          />
-          <figcaption>
-            <p className="kicker">{c.kicker}</p>
-            <p className="journey-chapter__lines">
-              {c.lines.map((l) => (
-                <span key={l}>{l}</span>
-              ))}
-            </p>
-          </figcaption>
-        </figure>
-      ))}
-    </div>
   )
 }
