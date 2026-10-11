@@ -10,26 +10,33 @@ interface Props {
   visible: boolean
 }
 
+/** Wide, landscape screens get the 1600×1000 composition baked for them. */
+export const WIDE = '(min-aspect-ratio: 1/1) and (min-width: 900px)'
+
 /**
- * Poster first, film second. The poster <img> — the film's first frame — is
- * the LCP element and paints immediately. The <video> downloads nothing by
+ * Poster first, film second. The poster — the film's first frame — is the
+ * LCP element and paints immediately. The <video> downloads nothing by
  * itself (preload="none"); useDroneFlight fetches the right <source> and
  * starts it, and it fades in over the identical poster frame.
- * Phones and tablets get the 504-px mobile cut, desktop the sharper one;
- * H.264 first, VP9 for browsers built without it.
+ * Wide screens get the landscape composition, phones the 504-px portrait
+ * cut, portrait tablets the sharper 756-px one; H.264 first, VP9 for
+ * browsers built without it.
  */
 export function HeroVideo({ ref, visible }: Props) {
   return (
     <div className="hero-video" data-ready={visible || undefined}>
-      <img
-        className="hero-video__poster"
-        src={journeySources.poster}
-        alt=""
-        width={504}
-        height={624}
-        fetchPriority="high"
-        decoding="async"
-      />
+      <picture>
+        <source media={WIDE} srcSet={journeySources.widePoster} width={1600} height={1000} />
+        <img
+          className="hero-video__poster"
+          src={journeySources.poster}
+          alt=""
+          width={504}
+          height={624}
+          fetchPriority="high"
+          decoding="async"
+        />
+      </picture>
       <video
         ref={ref}
         className="hero-video__el"
@@ -42,6 +49,8 @@ export function HeroVideo({ ref, visible }: Props) {
       >
         {/* Codec strings matter: without them a browser lacking H.264 still says
             "maybe" to plain video/mp4 and picks a file it cannot decode. */}
+        <source media={WIDE} src={journeySources.wide} type={MP4} />
+        <source media={WIDE} src={journeySources.wideWebm} type={WEBM} />
         <source media="(max-width: 768px)" src={journeySources.mobile} type={MP4} />
         <source media="(max-width: 768px)" src={journeySources.mobileWebm} type={WEBM} />
         <source src={journeySources.desktop} type={MP4} />

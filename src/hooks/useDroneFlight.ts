@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
  * loading  → poster on screen, film downloading
  * blocked  → the browser refused to autoplay (e.g. iOS Low Power Mode)
  * playing  → in flight (also while paused off-screen)
- * arrived  → the film has ended (or was skipped); the camera is settled
+ * paused   → the guest paused it
+ * arrived  → the film has ended; the camera has settled on the last frame
  */
-export type FlightPhase = 'loading' | 'blocked' | 'playing' | 'arrived'
+export type FlightPhase = 'loading' | 'blocked' | 'playing' | 'paused' | 'arrived'
 
 interface Options {
   videoRef: RefObject<HTMLVideoElement | null>
@@ -21,11 +22,10 @@ interface Options {
 /**
  * Plays the drone film once, on its own, as soon as the hero loads.
  *
- * The whole file (1.6 MB on phones) is fetched before playback starts, so the
- * flight never stalls mid-air on a slow connection; the poster — the film's
- * first frame — holds the screen meanwhile. Playback pauses while the hero is
- * off-screen or the tab is hidden and resumes where it left off, so the guest
- * always sees the landing.
+ * The whole file (under 1 MB on phones) is fetched before playback starts,
+ * so the camera never stalls mid-move on a slow connection; the poster — the
+ * film's first frame — holds the screen meanwhile. Playback pauses while the
+ * hero is off-screen or the tab is hidden and resumes where it left off.
  */
 // Coming back to "/" within the app (e.g. from the menu) lands straight away;
 // a fresh load or refresh flies again.
@@ -106,8 +106,7 @@ export function useDroneFlight({ videoRef, stageRef, enabled, onTime }: Options)
     // the film that is still on screen as its last frame.
   }, [videoRef, tryPlay])
 
-  // Land when the film ends — or if it can't play at all, so the guest is
-  // never left on a poster with no way to the menu.
+  // Settle when the film ends — or straight away if it can't play at all.
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -120,10 +119,10 @@ export function useDroneFlight({ videoRef, stageRef, enabled, onTime }: Options)
     }
   }, [videoRef])
 
-  // Drive overlays from the film's clock, only while it is actually playing.
+  // Report the film's clock every frame, only while it is actually playing.
   useEffect(() => {
     const video = videoRef.current
-    if (phase !== 'playing' || !video) return
+    if (phase !== 'playing' || !video || !onTimeRef.current) return
     let raf = 0
     const tick = () => {
       if (!video.paused) onTimeRef.current?.(video.currentTime, video.duration || 1)
@@ -162,12 +161,17 @@ export function useDroneFlight({ videoRef, stageRef, enabled, onTime }: Options)
     }
   }, [videoRef, stageRef, phase])
 
-  /** Jump to the landing: last frame, menu revealed. */
-  const skip = useCallback(() => {
+  /** Pause / resume (and start, if autoplay was refused). */
+  const toggle = useCallback(() => {
     const video = videoRef.current
-    if (video) video.pause()
-    setPhase('arrived')
-  }, [videoRef])
+    if (!video) return
+    if (phaseRef.current === 'playing') {
+      video.pause()
+      setPhase('paused')
+    } else if (phaseRef.current === 'paused' || phaseRef.current === 'blocked') {
+      tryPlay()
+    }
+  }, [videoRef, tryPlay])
 
-  return { phase, skip, play: tryPlay }
+  return { phase, toggle }
 }
