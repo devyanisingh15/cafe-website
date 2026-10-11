@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { cafe, journeyIdleEnd, journeyKeyframes } from '../data/cafe'
-import { useScrollVideo } from '../hooks/useScrollVideo'
-import { prefersLightData, prefersReducedMotion, stillSrc, stillSrcSet } from '../lib/media'
-import { CinematicTransition, JourneyStills, type CinematicHandle } from './CinematicTransition'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { cafe, flightTitleOut } from '../data/cafe'
+import { useDroneFlight } from '../hooks/useDroneFlight'
+import { prefersLightData, prefersReducedMotion } from '../lib/media'
+import { CinematicTransition, type CinematicHandle } from './CinematicTransition'
+import { HeroMenu } from './HeroMenu'
 import { HeroVideo } from './HeroVideo'
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n)
+
+/** Lets the page's "Skip the intro" link land the flight from outside. */
+export const SKIP_FLIGHT_EVENT = 'havana:skip-flight'
 
 function HeroCopy() {
   return (
@@ -30,66 +34,80 @@ function HeroCopy() {
 }
 
 /**
- * The opening: a tall section whose scroll range flies the camera from the
- * clouds to a seat inside the café. The stage is sticky; normal browser
- * scrolling drives everything — no gesture hijacking.
+ * The opening: one continuous drone flight that plays by itself — over the
+ * mountains, down to the village, at the café's glass front, through the
+ * door, and a slow tilt down to the window wall where the camera settles.
+ * Only then does the menu rise into the frame.
+ *
+ * Reduced motion / Data Saver: no film; the hero opens already landed, on
+ * the settled interior frame, with the menu in place.
  */
 export function MobileHero() {
-  const [still] = useState(() => prefersReducedMotion() || prefersLightData())
-  return still ? <StaticHero /> : <JourneyHero />
-}
+  const [enabled] = useState(() => !(prefersReducedMotion() || prefersLightData()))
 
-function JourneyHero() {
-  const sectionRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
-  const cueRef = useRef<HTMLButtonElement>(null)
   const cineRef = useRef<CinematicHandle>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const skipped = useRef(false)
+  const lastAmbient = useRef(0)
 
-  const onFrame = useCallback((p: number) => {
-    const o = clamp01(1 - (p - 0.004) / 0.05)
+  const onTime = useCallback((t: number, duration: number) => {
+    // The opening title holds over the mountains, then lifts away as the camera dives.
+    const o = clamp01((flightTitleOut - t) / 0.7)
     const copy = copyRef.current
     if (copy) {
       copy.style.opacity = String(o)
-      copy.style.transform = `translate3d(0, ${(-Math.min(p, 0.1) * 900).toFixed(1)}px, 0)`
+      copy.style.transform = `translate3d(0, ${(-(1 - o) * 40).toFixed(1)}px, 0)`
       copy.style.filter = o > 0.98 ? 'none' : `blur(${((1 - o) * 6).toFixed(1)}px)`
-      copy.style.visibility = o > 0 ? 'visible' : 'hidden'
+      // Opacity only (never visibility): the <h1> stays in the accessibility tree.
     }
-    if (cueRef.current) {
-      const c = clamp01(1 - p / 0.015)
-      cueRef.current.style.opacity = String(c)
-      cueRef.current.style.pointerEvents = c > 0.5 ? 'auto' : 'none'
+    cineRef.current?.update(t, duration)
+
+    // Desktop ambient wash: sample the frame a few times a second.
+    const canvas = canvasRef.current
+    const now = performance.now()
+    if (canvas && canvas.offsetParent && now - lastAmbient.current > 150 && videoRef.current) {
+      lastAmbient.current = now
+      canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
     }
-    // A slow push-in on top of the footage: the camera keeps moving forward.
-    stageRef.current?.style.setProperty('--push', (1 + p * 0.06).toFixed(4))
-    cineRef.current?.update(p)
   }, [])
 
-  const { ready } = useScrollVideo({
-    sectionRef,
-    videoRef,
-    keyframes: journeyKeyframes,
-    idleEnd: journeyIdleEnd,
-    enabled: true,
-    onFrame,
-  })
+  const { phase, skip, play } = useDroneFlight({ videoRef, stageRef, enabled, onTime })
+  const arrived = phase === 'arrived'
 
-  // Desktop only: an ambient wash sampled from the current frame, and a
-  // whisper of mouse parallax. Neither exists on touch devices.
+  const skipToMenu = useCallback(() => {
+    skipped.current = true
+    skip()
+  }, [skip])
+
+  // A deliberate skip moves focus to the menu; a natural landing doesn't
+  // steal it from wherever the guest is.
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)')
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const stage = stageRef.current
-    if (!mq.matches || !video || !canvas || !stage) return
-    const ctx = canvas.getContext('2d')
-    const draw = () => ctx?.drawImage(video, 0, 0, canvas.width, canvas.height)
-    video.addEventListener('seeked', draw)
-    video.addEventListener('timeupdate', draw)
-    video.addEventListener('loadeddata', draw)
+    if (arrived && skipped.current) headingRef.current?.focus({ preventScroll: true })
+  }, [arrived])
 
+  useEffect(() => {
+    window.addEventListener(SKIP_FLIGHT_EVENT, skipToMenu)
+    return () => window.removeEventListener(SKIP_FLIGHT_EVENT, skipToMenu)
+  }, [skipToMenu])
+
+  // Let the rest of the page (e.g. the nav's Order button) know where we
+  // are — before first paint, so nothing flashes.
+  useLayoutEffect(() => {
+    document.documentElement.dataset.flight = phase
+    return () => {
+      delete document.documentElement.dataset.flight
+    }
+  }, [phase])
+
+  // Desktop only: a whisper of mouse parallax on the framed film.
+  useEffect(() => {
+    const stage = stageRef.current
+    const mq = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)')
+    if (!stage || !mq.matches || !enabled) return
     let raf = 0
     const onMove = (e: PointerEvent) => {
       cancelAnimationFrame(raf)
@@ -100,63 +118,56 @@ function JourneyHero() {
     }
     window.addEventListener('pointermove', onMove, { passive: true })
     return () => {
-      video.removeEventListener('seeked', draw)
-      video.removeEventListener('timeupdate', draw)
-      video.removeEventListener('loadeddata', draw)
       window.removeEventListener('pointermove', onMove)
       cancelAnimationFrame(raf)
     }
-  }, [])
-
-  const explore = () => {
-    window.scrollBy({ top: window.innerHeight * 1.1, behavior: 'smooth' })
-  }
+  }, [enabled])
 
   return (
-    <section ref={sectionRef} className="journey" aria-label="Arriving at the café">
-      <div className="journey__stage" ref={stageRef}>
-        <canvas className="journey__ambient" ref={canvasRef} width={36} height={44} aria-hidden="true" />
-        <div className="journey__frame">
-          <HeroVideo ref={videoRef} ready={ready} />
+    <section className="flight" data-phase={phase} data-film={enabled || undefined} aria-label="Flying in to the café">
+      <div className="flight__stage" ref={stageRef}>
+        <canvas className="flight__ambient" ref={canvasRef} width={36} height={44} aria-hidden="true" />
+        <div className="flight__frame">
+          {enabled && <HeroVideo ref={videoRef} visible={phase === 'playing' || arrived} />}
+          {/* The settled frame. Identical to the film's last frame, so the hand-off is invisible. */}
+          <img
+            className="flight__end"
+            src="/media/journey-end-800.webp"
+            srcSet="/media/journey-end-400.webp 400w, /media/journey-end-800.webp 800w"
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            alt="Inside the café: blue booths and wooden chairs facing a wall of windows and snow peaks"
+            width={756}
+            height={936}
+            decoding="async"
+            loading={enabled ? 'lazy' : 'eager'}
+            fetchPriority={enabled ? 'low' : 'high'}
+          />
         </div>
-        <div className="journey__shade" aria-hidden="true" />
+        <div className="flight__shade" aria-hidden="true" />
+        <div className="flight__veil" aria-hidden="true" />
+
         <div className="hero-copy" ref={copyRef}>
           <HeroCopy />
         </div>
-        <CinematicTransition ref={cineRef} />
-        <button type="button" className="explore-cue" ref={cueRef} onClick={explore}>
-          <span className="explore-cue__arrow" aria-hidden="true" />
-          Explore
-        </button>
+
+        {enabled && <CinematicTransition ref={cineRef} />}
+
+        {!arrived && (
+          <div className="flight__controls">
+            {phase === 'blocked' && (
+              <button type="button" className="btn btn--light flight__begin" onClick={play}>
+                <span className="flight__play" aria-hidden="true" />
+                Begin the flight
+              </button>
+            )}
+            <button type="button" className="flight__skip" onClick={skipToMenu}>
+              Skip intro
+            </button>
+          </div>
+        )}
+
+        <HeroMenu open={arrived} headingRef={headingRef} />
       </div>
     </section>
-  )
-}
-
-function StaticHero() {
-  return (
-    <>
-      <section className="static-hero" aria-label="Welcome">
-        <img
-          className="static-hero__img"
-          src={stillSrc('clouds')}
-          srcSet={stillSrcSet('clouds')}
-          sizes="100vw"
-          alt="Clouds pouring over a mountain ridge above the valley"
-          fetchPriority="high"
-          width={504}
-          height={624}
-        />
-        <div className="journey__shade" aria-hidden="true" />
-        <div className="hero-copy">
-          <HeroCopy />
-        </div>
-        <a className="explore-cue" href="#arrive">
-          <span className="explore-cue__arrow" aria-hidden="true" />
-          Explore
-        </a>
-      </section>
-      <JourneyStills />
-    </>
   )
 }
