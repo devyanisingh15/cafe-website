@@ -13,10 +13,7 @@ export const journeySources = {
   desktop: '/media/journey-desktop.mp4',
   mobileWebm: '/media/journey-mobile.webm',
   desktopWebm: '/media/journey-desktop.webm',
-  wide: '/media/journey-wide.mp4',
-  wideWebm: '/media/journey-wide.webm',
   poster: '/media/journey-poster.webp',
-  widePoster: '/media/journey-wide-poster.webp',
 }
 
 export function prefersReducedMotion() {

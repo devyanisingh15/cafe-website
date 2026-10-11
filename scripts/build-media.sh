@@ -21,86 +21,70 @@ V54="$SRC/$(pick IMG_0054)"
 V55="$SRC/$(pick IMG_0055)"
 
 CROP="crop=504:624:0:360"
-FPS=24     # delivered frame rate
-SUB=72     # the camera move is rendered at 72 fps, then blended to 24 fps
-XF=0.5     # fly-through length between shots
-TAIL=0.9   # the last frame is held while the camera settles
+FPS=24
+XF=0.6     # fly-through length between shots
+TAIL=1.2   # the last frame is held while the camera settles
 
-# --- 1. The hero film ---------------------------------------------------------
-# One ~10 s drone approach, golden hour: an elevated establishing shot of the
-# café among the village and mountains → the real forward approach to its
-# glass front → the front door → the sign → inside, a slow tilt down to the
-# window wall where the camera settles.
+# --- 1. The drone flight ------------------------------------------------------
+# One forward camera move: mountains -> valley -> the café appears -> fly at
+# its glass front -> the door -> inside -> tilt down to the window wall.
+# Only shots whose own motion is forward (or reads forward) are used; shot
+# "rev" is the drone pulling away from the café, played backwards.
 #
-# Shot "rev" is the drone pulling away from the café, played backwards.
-# Every shot carries its own camera move (zoom = forward travel, focus drift =
-# slight lateral/elevation change). Across each cut the outgoing shot
-# accelerates into its frame while the incoming one decelerates out of a
-# zoom, so it reads as flying through, not as a cut. Rendering the move at
-# 72 fps and blending to 24 fps gives real motion blur — only where the
-# camera is moving fast.
+# Every shot gets a continuous push-in. Across each cut the outgoing shot
+# accelerates into its frame while the incoming one decelerates out of a zoom,
+# so the cut reads as flying through rather than as a new scene.
 #
-# z0 is the shot's base framing (1 = whole clean frame), push the zoom it
-# gains as the camera travels, fx/fy where the camera is aimed (0–1).
-#
-#   file  start dur  fx0  fx1  fy0  fy1  z0   push  flags
+#   file  start  dur  focus-x focus-y  flags
 SHOTS=(
-  "$V53 9.60  2.10 0.40 0.52 0.58 0.55 1.00 0.04 -"     # establishing: village, café, mountains
-  "$V53 1.00  2.40 0.50 0.50 0.00 0.06 1.40 0.12 rev"   # flying at the café's glass front
-  "$V54 3.80  1.50 0.42 0.46 0.45 0.50 1.00 0.10 -"     # the front door
-  "$V54 6.80  1.30 0.45 0.50 0.62 0.66 1.00 0.14 -"     # under the sign, into the door
-  "$V55 0.10  3.60 0.50 0.50 0.36 0.34 1.00 0.05 last"  # inside: tilt down to the window wall
+  "$V54 0.05  1.80 0.50 0.45 -"    # clouds pouring over the cliffs
+  "$V54 2.20  1.30 0.55 0.70 -"    # the mountain flank, valley floor below
+  "$V53 17.90 1.40 0.55 0.55 -"    # down over the village
+  "$V53 9.60  2.10 0.50 0.62 -"    # the blue roof comes into view
+  "$V53 0.70  2.70 0.50 0.08 rev"  # flying at the café's glass front
+  "$V54 3.80  1.60 0.42 0.45 -"    # the front door, the sign above
+  "$V54 6.80  1.40 0.45 0.62 -"    # through the door
+  "$V54 8.35  2.80 0.50 0.45 -"    # inside: prayer flags, the games tables
+  "$V55 0.10  3.60 0.50 0.62 last" # tilt down: booths, window wall, Himalaya
 )
 
-IN_B=0.20  # extra zoom an incoming shot starts with
-OUT_B=0.34 # extra zoom an outgoing shot flies into
-W=756; H=936
-
-# Golden-hour grade: warm highlights, rosy sky, soft lifted shadows; blues
-# (the roof, the booths) stay blue.
-GRADE="colorbalance=rs=0.04:gs=-0.01:bs=0.03:rm=0.07:gm=0.0:bm=-0.06:rh=0.12:gh=0.02:bh=-0.04,curves=r='0/0.05 0.45/0.52 1/1':g='0/0.03 0.5/0.48 1/0.93':b='0/0.07 0.5/0.45 1/0.88',eq=saturation=1.05:contrast=0.97"
-
-# Static layers, made once: a low sun glow from the top left, and an elliptical
-# mask that softens the frame's edges (a hint of depth of field).
-LAYERS="$(mktemp -d)"
-SUNF="pow(max(0\,1-hypot(X-W*0.12\,Y-H*0.02)/(W*1.05))\,1.6)"
-ffmpeg -v error -y -f lavfi -i "color=black:s=${W}x${H},format=gbrp" -frames:v 1 \
-  -vf "geq=r='235*$SUNF':g='120*$SUNF':b='90*$SUNF'" "$LAYERS/sun.png"
-ffmpeg -v error -y -f lavfi -i "color=black:s=${W}x${H},format=gray" -frames:v 1 \
-  -vf "geq=lum='255*clip((hypot((X-W/2)/(W*0.5)\,(Y-H*0.47)/(H*0.5))-0.62)/0.45\,0\,1)'" "$LAYERS/dof.png"
+PUSH=0.10    # zoom gained across each shot
+IN_B=0.14    # extra zoom an incoming shot starts with
+OUT_B=0.22   # extra zoom an outgoing shot flies into
+W=756; H=936 # master size; the mobile cut is scaled from it
 
 n=${#SHOTS[@]}
 inputs=()
 filter=""
 total=0
 starts=()
-sm() { echo "(($1)*($1)*(3-2*($1)))"; } # smoothstep
 for ((k = 0; k < n; k++)); do
-  read -r f ss d fx0 fx1 fy0 fy1 z0 push flag <<<"${SHOTS[$k]}"
+  read -r f ss d fx fy flag <<<"${SHOTS[$k]}"
   inputs+=(-ss "$ss" -t "$d" -i "$f")
   len=$d
-  pre="[$k:v]$CROP,fps=$SUB"
+  pre="[$k:v]$CROP,fps=$FPS"
   [[ $flag == rev ]] && pre+=",reverse"
   pre+=",setpts=PTS-STARTPTS"
   if [[ $flag == last ]]; then
     pre+=",tpad=stop_mode=clone:stop_duration=$TAIL"
     len=$(awk -v d="$d" -v t="$TAIL" 'BEGIN{print d+t}')
   fi
-  N=$(awk -v l="$len" -v r="$SUB" 'BEGIN{printf "%d", l*r+0.5}')
-  t="(on/$SUB)"
+  N=$(awk -v l="$len" -v r="$FPS" 'BEGIN{printf "%d", l*r+0.5}')
+  t="(on/$FPS)"
   u="(on/$((N - 1)))"
-  e=$(sm "$u") # eased progress through the shot
+  sm() { echo "(($1)*($1)*(3-2*($1)))"; } # smoothstep
   if [[ $flag == last ]]; then
-    z="$z0+$push*(1-(1-$u)*(1-$u)*(1-$u))" # long ease-out: the camera settles
+    # Ease out: the camera slows and settles in its seat.
+    z="1+$PUSH*1.4*(1-(1-$u)*(1-$u))"
   else
-    z="$z0+$push*$e"
+    z="1+$PUSH*$u"
   fi
   ((k > 0)) && z+="+$IN_B*(1-$(sm "clip($t/$XF,0,1)"))"
-  [[ $flag != last ]] && z+="+$OUT_B*$(sm "clip(($t-($len-$XF))/$XF,0,1)")*$(sm "clip(($t-($len-$XF))/$XF,0,1)")"
-  fx="($fx0+($fx1-$fx0)*$e)"
-  fy="($fy0+($fy1-$fy0)*$e)"
-  filter+="$pre,scale=$((W * 2)):$((H * 2)):flags=lanczos,"
-  filter+="zoompan=z='$z':x='$fx*(iw-iw/zoom)':y='$fy*(ih-ih/zoom)':d=1:s=${W}x${H}:fps=$SUB,format=yuv420p[s$k];"
+  [[ $flag != last ]] && z+="+$OUT_B*$(sm "clip(($t-($len-$XF))/$XF,0,1)")"
+  filter+="$pre,scale=$((W * 3)):$((H * 3)):flags=lanczos,"
+  filter+="zoompan=z='$z':x='$fx*(iw-iw/zoom)':y='$fy*(ih-ih/zoom)':d=1:s=${W}x${H}:fps=$FPS,"
+  filter+="eq=saturation=1.05:contrast=1.04,colorbalance=rm=0.02:bh=-0.02,format=yuv420p[s$k];"
+  # Running start time of each shot, for the overlays in src/data/cafe.ts.
   if ((k == 0)); then starts+=(0); total=$d; else
     starts+=("$(awk -v t="$total" -v x="$XF" 'BEGIN{printf "%.2f", t-x}')")
     total=$(awk -v t="$total" -v l="$len" -v x="$XF" 'BEGIN{printf "%.3f", t+l-x}')
@@ -112,45 +96,22 @@ for ((k = 1; k < n; k++)); do
   filter+="[$prev][s$k]xfade=transition=fade:duration=$XF:offset=${starts[$k]}[x$k];"
   prev="x$k"
 done
-# Motion blur (3 × 1/72 s ≈ a 1/24 s shutter), then grade, glow, sun, soft edges.
-filter+="[$prev]tmix=frames=3:weights='1 2 1',fps=$FPS,format=gbrp,$GRADE,format=gbrp,split=3[c0][c1][c2];"
-filter+="[c1]gblur=sigma=16[glow];[c0][glow]blend=all_mode=screen:all_opacity=0.18[g1];"
-filter+="[$n:v]format=gbrp,scale=$W:$H[sun];[g1][sun]blend=all_mode=screen:all_opacity=0.5[g2];"
-filter+="[c2]gblur=sigma=3.5[soft];"
-filter+="[g2]format=gbrp[g3];[soft]format=gbrp[soft2];[$((n + 1)):v]format=gray,scale=$W:$H[mask];"
-filter+="[g3][soft2][mask]maskedmerge,format=yuv420p[out]"
-echo "film length: ${total}s   shot starts: ${starts[*]}"
+filter="${filter%;}"
+filter="${filter%\[x$((n - 1))\]}"
+echo "flight length: ${total}s   shot starts: ${starts[*]}"
 
 X264="-c:v libx264 -preset slow -profile:v high -pix_fmt yuv420p -movflags +faststart -an -g 48"
 MASTER="$OUT/.journey-master.mp4"
-ffmpeg -v error -y "${inputs[@]}" -loop 1 -i "$LAYERS/sun.png" -loop 1 -i "$LAYERS/dof.png" \
-  -filter_complex "$filter" -map "[out]" -t "$total" $X264 -crf 14 "$MASTER"
-rm -r "$LAYERS"
+ffmpeg -v error -y "${inputs[@]}" -filter_complex "$filter[out]" -map "[out]" $X264 -crf 14 "$MASTER"
 
-ffmpeg -v error -y -i "$MASTER" -vf "scale=504:624:flags=lanczos" $X264 -crf 26 "$OUT/journey-mobile.mp4"
-ffmpeg -v error -y -i "$MASTER" $X264 -crf 23 "$OUT/journey-desktop.mp4"
-
-# Wide screens (landscape, ≥ 900 px): the film is portrait, so rather than
-# stretching it, the sharp shot sits centred at native size and its sides
-# dissolve into a soft, blurred extension of the same frame. 1600×1000 covers
-# 16:10 and 16:9 screens with a little crop.
-WW=1600; WH=1000; FW=808
-ffmpeg -v error -y -f lavfi -i "color=black:s=${FW}x${WH},format=gray" -frames:v 1 \
-  -vf "geq=lum='255*clip(min(X\,W-X)/(W*0.16)\,0\,1)'" "$OUT/.feather.png"
-ffmpeg -v error -y -i "$MASTER" -loop 1 -i "$OUT/.feather.png" -filter_complex "
-  [0]split[a][b];
-  [a]scale=$WW:-2,crop=$WW:$WH,gblur=sigma=36,eq=brightness=-0.04:saturation=1.1[bg];
-  [b]scale=$FW:$WH:flags=lanczos,format=rgba[fg];
-  [1]format=gray[m];[fg][m]alphamerge[fgm];
-  [bg][fgm]overlay=(W-w)/2:0:shortest=1,format=yuv420p" \
-  $X264 -crf 24 "$OUT/journey-wide.mp4"
-rm "$MASTER" "$OUT/.feather.png"
+ffmpeg -v error -y -i "$MASTER" -vf "scale=504:624:flags=lanczos" $X264 -crf 27 "$OUT/journey-mobile.mp4"
+ffmpeg -v error -y -i "$MASTER" -vf "unsharp=5:5:0.4" $X264 -crf 24 "$OUT/journey-desktop.mp4"
+rm "$MASTER"
 
 # VP9 fallbacks for browsers built without H.264 (e.g. open-source Chromium).
 VP9="-c:v libvpx-vp9 -b:v 0 -g 48 -row-mt 1 -deadline good -cpu-used 2 -an -pix_fmt yuv420p"
 ffmpeg -v error -y -i "$OUT/journey-mobile.mp4" $VP9 -crf 40 "$OUT/journey-mobile.webm"
 ffmpeg -v error -y -i "$OUT/journey-desktop.mp4" $VP9 -crf 36 "$OUT/journey-desktop.webm"
-ffmpeg -v error -y -i "$OUT/journey-wide.mp4" $VP9 -crf 37 "$OUT/journey-wide.webm"
 
 # Poster = the opening frame (clouds), so the hero paints before any video bytes.
 ffmpeg -v error -y -i "$OUT/journey-mobile.mp4" -frames:v 1 -c:v libwebp -quality 72 "$OUT/journey-poster.webp"
@@ -163,8 +124,6 @@ for w in 400 800; do
   ffmpeg -v error -y -i "$OUT/.tmp-end.png" -vf "scale=$w:-2:flags=lanczos" -c:v libwebp -quality 74 "$OUT/journey-end-$w.webp"
 done
 rm "$OUT/.tmp-end.png"
-ffmpeg -v error -y -i "$OUT/journey-wide.mp4" -frames:v 1 -c:v libwebp -quality 70 "$OUT/journey-wide-poster.webp"
-ffmpeg -v error -sseof -0.1 -y -i "$OUT/journey-wide.mp4" -frames:v 1 -update 1 -c:v libwebp -quality 72 "$OUT/journey-wide-end.webp"
 
 # --- 2. Stills for the story, gallery and menu --------------------------------
 STILLS=(

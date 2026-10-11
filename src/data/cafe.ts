@@ -21,12 +21,22 @@ export const navLinks = [
   { label: 'Instagram', href: cafe.instagram, external: true },
 ] as const
 
-/** Hero copy (placeholder — replace with the café's own words). */
-export const hero = {
-  headline: ['Where the horizon meets', 'timeless elegance'],
-  support: 'Indulge in an unparalleled escape where sophisticated living meets the endless allure of nature.',
-  cta: { label: 'Book a tour', href: '/#visit' },
-} as const
+/**
+ * Words over the flight, timed to the film (seconds). Each line is fully
+ * visible from `from` to `to` and fades in and out around that window.
+ * Shot starts (printed by scripts/build-media.sh): mountains 0, valley 1.2,
+ * village 1.9, blue roof 2.7, approach 4.2, front door 6.3, sign 7.3,
+ * inside 8.1, window wall 10.3; the camera settles by ~14 s.
+ */
+export const flightTitleOut = 2.6 // the opening title leaves as the camera dives
+export const flightChapters = [
+  { from: 3.0, to: 4.1, kicker: 'Sissu, Lahaul', lines: ['There —', 'the blue roof.'] },
+  { from: 6.5, to: 7.4, kicker: 'Arrival', lines: ['The road ends', 'at our door.'] },
+  { from: 8.6, to: 9.8, kicker: 'Come in', lines: ['Mind the', 'prayer flags.'] },
+] as const
+
+/** Dishes shown in the menu that rises when the flight lands. */
+export const arrivalPicks = ['cappuccino', 'masala-chai', 'veg-momos'] as const
 
 export type Still =
   | 'interior-windows'
