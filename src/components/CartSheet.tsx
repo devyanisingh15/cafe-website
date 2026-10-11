@@ -1,6 +1,6 @@
 import { useCart } from '../hooks/useCart'
 import { menuById } from '../data/menu'
-import { FoodArt } from './FoodArt'
+import { DishImage } from './DishImage'
 import { QtyControl } from './QtyControl'
 import { Sheet } from './Sheet'
 
@@ -69,7 +69,7 @@ export function CartSheet({ open, onClose, table, onChangeTable, onPlace, placin
               return (
                 <li key={l.id} className="cart__line">
                   <span className="cart__thumb" aria-hidden="true">
-                    <FoodArt kind={item.art.kind} bg={item.art.bg} tint={item.art.tint} label="" />
+                    <DishImage item={item} sizes="56px" decorative />
                   </span>
                   <span className="cart__name">{l.name}</span>
                   <span className="cart__price price">₹{l.price * l.qty}</span>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { cafe, navLinks } from '../data/cafe'
+import { cafe, hero, navLinks } from '../data/cafe'
 import { Logo } from './Logo'
 
 /**
- * Transparent over the hero, then a compact floating pill once you start
- * flying. ☰ opens a full-screen menu; on wide screens the links sit inline.
+ * Fixed above the hero film: brand left, links centre, primary CTA right.
+ * Transparent over the hero, a compact floating pill once you scroll on.
+ * On phones ☰ opens a full-screen menu and the brand sits centre.
  */
 export function MobileNavigation() {
   const [compact, setCompact] = useState(false)
@@ -86,9 +87,12 @@ export function MobileNavigation() {
               ),
             )}
           </nav>
-          <Link to="/menu" viewTransition className="site-nav__order">
-            Order
-          </Link>
+          <a href={hero.cta.href.replace('/', '')} className="site-nav__cta">
+            {hero.cta.label}
+            <span className="site-nav__cta-arrow" aria-hidden="true">
+              →
+            </span>
+          </a>
         </div>
       </header>
 

@@ -14,10 +14,11 @@
     <script>
       // The cinematic route paints the poster first; the QR menu route never needs it.
       if (location.pathname === '/' || location.pathname === '') {
+        var wide = matchMedia('(min-aspect-ratio: 1/1) and (min-width: 900px)').matches
         var l = document.createElement('link')
         l.rel = 'preload'
         l.as = 'image'
-        l.href = '/media/journey-poster.webp'
+        l.href = wide ? '/media/journey-wide-poster.webp' : '/media/journey-poster.webp'
         l.setAttribute('fetchpriority', 'high')
         document.head.appendChild(l)
       }

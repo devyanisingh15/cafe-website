@@ -26,7 +26,7 @@ function reducer(state: Quantities, action: Action): Quantities {
 function load(): Quantities {
   try {
     const raw = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? '{}') as Quantities
-    return Object.fromEntries(Object.entries(raw).filter(([id, q]) => menuById.has(id) && q > 0))
+    return Object.fromEntries(Object.entries(raw).filter(([id, q]) => menuById.has(id) && !menuById.get(id)!.soldOut && q > 0))
   } catch {
     return {}
   }
