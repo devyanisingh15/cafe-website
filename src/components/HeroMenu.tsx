@@ -4,7 +4,7 @@ import { arrivalPicks } from '../data/cafe'
 import { categories, menuById } from '../data/menu'
 import { useCart } from '../hooks/useCart'
 import { normaliseTable } from '../hooks/useTableNumber'
-import { FoodArt } from './FoodArt'
+import { DishImage } from './DishImage'
 import { QtyControl } from './QtyControl'
 
 const PICKS = arrivalPicks.map((id) => menuById.get(id)!)
@@ -56,7 +56,7 @@ export function HeroMenu({ open, headingRef }: { open: boolean; headingRef?: Ref
           {PICKS.map((item) => (
             <li key={item.id} className="arrival__pick">
               <span className="arrival__thumb" aria-hidden="true">
-                <FoodArt kind={item.art.kind} bg={item.art.bg} tint={item.art.tint} label="" />
+                <DishImage item={item} sizes="52px" decorative />
               </span>
               <span className="arrival__name">
                 {item.name}

@@ -245,11 +245,70 @@ body:has(.menu-app) {
   border-radius: 50%;
   background: currentColor;
 }
-.diet--veg {
+.diet--veg,
+.diet--vegan {
   color: var(--veg);
+}
+.diet--egg {
+  color: #a8641e;
 }
 .diet--nonveg {
   color: var(--nonveg);
+}
+/* Non-veg and egg use a triangle, as on Indian menus, so the mark never
+   relies on colour alone. */
+.diet--nonveg::after,
+.diet--egg::after {
+  inset: 2px;
+  border-radius: 0;
+  clip-path: polygon(50% 8%, 96% 92%, 4% 92%);
+}
+
+.card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.card__meta li + li::before {
+  content: '·';
+  margin-right: 12px;
+  opacity: 0.6;
+}
+.card__spice > span {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+.card__spice > span > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(165, 55, 42, 0.22);
+}
+.card__spice > span > span.on {
+  background: var(--nonveg);
+}
+.card__tag--out {
+  background: var(--ink);
+  color: var(--snow);
+}
+.card[data-soldout] .card__media > :first-child {
+  filter: grayscale(0.85) opacity(0.7);
+}
+.card__soldout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-2);
 }
 
 .menu-foot {

@@ -109,6 +109,12 @@ Every control is at least 44 px. Focus states are visible. The cart, table picke
 
 ## Placeholders to replace
 
-- **Menu items and prices**: `src/data/menu.ts`.
-- **Food images**: no food photos were supplied, so each dish is drawn as a top-down SVG illustration (`FoodArt.tsx`). To use a photo, add `photo: '/media/menu/<name>'` to an item and provide `<name>-400.webp` and `<name>-800.webp`. The card switches to the photo automatically.
+- **Menu**: `src/data/menu.ts` holds a mock menu of 41 dishes across six categories. Each dish has a price, a diet type (veg / vegan / egg / non-veg, marked the Indian way), a spice level, a prep time, an optional tag, and a `soldOut` flag. The trout is marked sold out, to show that state.
+- **Dish photos**: put full-size photos named by dish id (e.g. `cappuccino.jpg`) in a folder, then run:
+
+  ```bash
+  bash scripts/build-menu-photos.sh /path/to/photos
+  ```
+
+  The script centre-crops each photo to the card's 16:10 and writes `public/media/menu/<id>-400.webp` and `-800.webp`. It also regenerates `src/data/menu-photos.ts`, the list of dishes that have a photo. Any dish without a photo falls back to its drawn plate (`FoodArt.tsx`).
 - **Hours, address, altitude, Instagram**: `src/data/cafe.ts`.
